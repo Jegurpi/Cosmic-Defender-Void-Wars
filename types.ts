@@ -18,7 +18,8 @@ export enum EnemyType {
   FAST = 'FAST',
   TANK = 'TANK',
   MINIBOSS = 'MINIBOSS',
-  BOSS = 'BOSS'
+  BOSS = 'BOSS',
+  ASTEROID = 'ASTEROID'
 }
 
 export interface Vector2 {
@@ -34,12 +35,24 @@ export interface Entity {
   height: number;
   color: string;
   markedForDeletion: boolean;
+  rotation?: number; // For visual rotation
 }
 
 export interface Particle extends Entity {
   life: number;
   maxLife: number;
   alpha: number;
+}
+
+export interface FloatingText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  color: string;
+  life: number;
+  velocity: Vector2;
+  scale: number;
 }
 
 export interface Bullet extends Entity {
@@ -89,6 +102,8 @@ export interface GameStats {
   bossActive: boolean;
   missionTimeRemaining: number; // in ms
   isLevelComplete: boolean;
+  combo: number;
+  comboTimer: number;
 }
 
 export interface UpgradeOption {

@@ -11,9 +11,11 @@ enum AppState {
 export default function App() {
   const [appState, setAppState] = useState<AppState>(AppState.MENU);
   const [selectedClass, setSelectedClass] = useState<ShipClass>(ShipClass.INTERCEPTOR);
+  const [gameMode, setGameMode] = useState<'SINGLE' | 'COOP'>('SINGLE');
   const [lastScore, setLastScore] = useState(0);
 
-  const startGame = () => {
+  const startGame = (mode: 'SINGLE' | 'COOP') => {
+    setGameMode(mode);
     setAppState(AppState.PLAYING);
   };
 
@@ -36,7 +38,7 @@ export default function App() {
         <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-center mb-4 tracking-tighter drop-shadow-lg">
           VOID WARS
         </h1>
-        <p className="text-slate-300 text-center mb-12 text-lg tracking-widest uppercase">Выберите свой корабль</p>
+        <p className="text-slate-300 text-center mb-12 text-lg tracking-widest uppercase">Выберите класс корабля</p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
           {(Object.keys(SHIP_STATS) as ShipClass[]).map((cls) => {
@@ -77,13 +79,24 @@ export default function App() {
           })}
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-6">
           <button
-            onClick={startGame}
-            className="px-12 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xl font-bold rounded-lg shadow-lg transform transition active:scale-95 tracking-widest"
+            onClick={() => startGame('SINGLE')}
+            className="px-12 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xl font-bold rounded-lg shadow-lg transform transition active:scale-95 tracking-widest min-w-[250px]"
           >
-            НАЧАТЬ МИССИЮ
+            ОДИНОЧНАЯ
           </button>
+          
+          <button
+            onClick={() => startGame('COOP')}
+            className="px-12 py-4 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white text-xl font-bold rounded-lg shadow-lg transform transition active:scale-95 tracking-widest min-w-[250px]"
+          >
+            2 ИГРОКА (CO-OP)
+          </button>
+        </div>
+        
+        <div className="text-center mt-6 text-xs text-slate-500 font-mono">
+            CO-OP: ИГРОК 1 (WASD+E) | ИГРОК 2 (СТРЕЛКИ+SHIFT)
         </div>
       </div>
     </div>
@@ -122,6 +135,7 @@ export default function App() {
       {appState === AppState.PLAYING && (
         <GameCanvas 
           selectedClass={selectedClass} 
+          gameMode={gameMode}
           onGameOver={handleGameOver}
           onExit={handleExit}
         />
