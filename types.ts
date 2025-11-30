@@ -1,4 +1,5 @@
 
+
 export enum ShipClass {
   INTERCEPTOR = 'INTERCEPTOR',
   CRUISER = 'CRUISER',
@@ -126,6 +127,16 @@ export interface Achievement {
 
 export interface GlobalStats {
   totalKills: number;
+}
+
+// Yandex SDK Types
+declare global {
+  interface Window {
+    YaGames: {
+      init: () => Promise<any>;
+    };
+    ysdk: any;
+  }
 }
 
 export const SHIP_STATS = {

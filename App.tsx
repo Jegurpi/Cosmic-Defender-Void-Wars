@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { ShipClass, SHIP_STATS, GameStats, GlobalStats, Achievement } from './types';
 import { ACHIEVEMENTS_LIST } from './constants';
@@ -23,6 +24,8 @@ export default function App() {
   const [achievements, setAchievements] = useState<Achievement[]>(ACHIEVEMENTS_LIST);
   const [globalStats, setGlobalStats] = useState<GlobalStats>({ totalKills: 0 });
 
+  const sdkInitRef = useRef(false);
+
   // Load from local storage
   useEffect(() => {
     const savedAch = localStorage.getItem('void_wars_achievements');
@@ -42,16 +45,23 @@ export default function App() {
 
   // Initialize Yandex SDK
   useEffect(() => {
+    if (sdkInitRef.current) return;
+
     const initSDK = async () => {
-      if ((window as any).YaGames) {
+      if (window.YaGames) {
+        sdkInitRef.current = true;
         try {
-          const ysdk = await (window as any).YaGames.init();
-          console.log('Yandex SDK initialized');
+          const ysdk = await window.YaGames.init();
+          window.ysdk = ysdk; // Set global reference
+          console.log('Yandex SDK initialized successfully');
           // Inform the SDK that the game has loaded and is ready to play
           ysdk.features.LoadingAPI?.ready();
         } catch (e) {
           console.error('Yandex SDK initialization failed:', e);
+          sdkInitRef.current = false; // Allow retry if failed (optional)
         }
+      } else {
+          console.log('YaGames object not found on window (yet). Script might be loading or blocked.');
       }
     };
     initSDK();
