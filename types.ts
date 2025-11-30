@@ -1,3 +1,4 @@
+
 export enum ShipClass {
   INTERCEPTOR = 'INTERCEPTOR',
   CRUISER = 'CRUISER',
@@ -108,16 +109,29 @@ export interface GameStats {
 
 export interface UpgradeOption {
   id: string;
-  name: string;
-  description: string;
+  nameKey: string;
+  descKey: string;
   apply: (player: Player) => void;
   rarity: 'COMMON' | 'RARE' | 'LEGENDARY';
 }
 
+export interface Achievement {
+  id: string;
+  nameKey: string;
+  descKey: string;
+  isUnlocked: boolean;
+  condition: (stats: GameStats, globalStats: GlobalStats, sessionStats: any) => boolean;
+  type: 'SESSION' | 'CUMULATIVE';
+}
+
+export interface GlobalStats {
+  totalKills: number;
+}
+
 export const SHIP_STATS = {
   [ShipClass.INTERCEPTOR]: {
-    name: 'Перехватчик',
-    description: 'Быстрый, скорострельный. Навык: Гипер-драйв.',
+    nameKey: 'SHIP_INTERCEPTOR_NAME',
+    descKey: 'SHIP_INTERCEPTOR_DESC',
     hp: 60,
     speed: 7,
     fireRate: 150,
@@ -126,14 +140,14 @@ export const SHIP_STATS = {
     width: 30,
     height: 30,
     collisionResist: 0,
-    skillName: 'Гипер-драйв',
-    skillDesc: 'Скорострельность x3 на 3 сек.',
+    skillNameKey: 'SKILL_INTERCEPTOR_NAME',
+    skillDescKey: 'SKILL_INTERCEPTOR_DESC',
     skillCooldown: 10000,
     skillDuration: 3000
   },
   [ShipClass.CRUISER]: {
-    name: 'Крейсер',
-    description: 'Сбалансированный. Навык: Ракетный залп.',
+    nameKey: 'SHIP_CRUISER_NAME',
+    descKey: 'SHIP_CRUISER_DESC',
     hp: 100,
     speed: 5,
     fireRate: 250,
@@ -142,14 +156,14 @@ export const SHIP_STATS = {
     width: 40,
     height: 40,
     collisionResist: 0.1,
-    skillName: 'Ракетный залп',
-    skillDesc: 'Выпускает веер самонаводящихся ракет.',
+    skillNameKey: 'SKILL_CRUISER_NAME',
+    skillDescKey: 'SKILL_CRUISER_DESC',
     skillCooldown: 8000,
     skillDuration: 0
   },
   [ShipClass.DESTROYER]: {
-    name: 'Разрушитель',
-    description: 'Мощный. Навык: Мега-луч.',
+    nameKey: 'SHIP_DESTROYER_NAME',
+    descKey: 'SHIP_DESTROYER_DESC',
     hp: 180,
     speed: 3,
     fireRate: 400,
@@ -158,14 +172,14 @@ export const SHIP_STATS = {
     width: 50,
     height: 50,
     collisionResist: 0.2,
-    skillName: 'Мега-луч',
-    skillDesc: 'Уничтожает все пули и наносит огромный урон.',
+    skillNameKey: 'SKILL_DESTROYER_NAME',
+    skillDescKey: 'SKILL_DESTROYER_DESC',
     skillCooldown: 15000,
     skillDuration: 1000 // visual duration
   },
   [ShipClass.SPECTRE]: {
-    name: 'Призрак',
-    description: 'Снайпер. Навык: Фазировка.',
+    nameKey: 'SHIP_SPECTRE_NAME',
+    descKey: 'SHIP_SPECTRE_DESC',
     hp: 40,
     speed: 9,
     fireRate: 600,
@@ -174,14 +188,14 @@ export const SHIP_STATS = {
     width: 25,
     height: 35,
     collisionResist: 0,
-    skillName: 'Фазировка',
-    skillDesc: 'Неуязвимость и ускорение на 3 сек.',
+    skillNameKey: 'SKILL_SPECTRE_NAME',
+    skillDescKey: 'SKILL_SPECTRE_DESC',
     skillCooldown: 12000,
     skillDuration: 3000
   },
   [ShipClass.TITAN]: {
-    name: 'Титан',
-    description: 'Танк. Навык: Ремонтные дроны.',
+    nameKey: 'SHIP_TITAN_NAME',
+    descKey: 'SHIP_TITAN_DESC',
     hp: 300,
     speed: 2,
     fireRate: 300,
@@ -190,8 +204,8 @@ export const SHIP_STATS = {
     width: 60,
     height: 60,
     collisionResist: 0.7, // 70% resistance to collisions
-    skillName: 'Ремонт',
-    skillDesc: 'Восстанавливает 30% HP и создает щит.',
+    skillNameKey: 'SKILL_TITAN_NAME',
+    skillDescKey: 'SKILL_TITAN_DESC',
     skillCooldown: 20000,
     skillDuration: 0
   }

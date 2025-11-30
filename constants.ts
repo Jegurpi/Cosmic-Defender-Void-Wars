@@ -1,3 +1,6 @@
+
+import { Achievement } from './types';
+
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 
@@ -56,3 +59,54 @@ export const KEYS = {
   P: 'p',
   ESC: 'Escape'
 };
+
+export const ACHIEVEMENTS_LIST: Achievement[] = [
+  {
+    id: 'first_blood',
+    nameKey: 'ACH_FIRST_BLOOD',
+    descKey: 'ACH_FIRST_BLOOD_DESC',
+    isUnlocked: false,
+    type: 'SESSION',
+    condition: (stats, global, session) => session.kills >= 10
+  },
+  {
+    id: 'survivor',
+    nameKey: 'ACH_SURVIVOR',
+    descKey: 'ACH_SURVIVOR_DESC',
+    isUnlocked: false,
+    type: 'SESSION',
+    condition: (stats, global, session) => session.timeAlive >= 120000 // 2 min
+  },
+  {
+    id: 'collector',
+    nameKey: 'ACH_COLLECTOR',
+    descKey: 'ACH_COLLECTOR_DESC',
+    isUnlocked: false,
+    type: 'SESSION',
+    condition: (stats, global, session) => session.powerupsCollected >= 5
+  },
+  {
+    id: 'boss_killer',
+    nameKey: 'ACH_BOSS_KILLER',
+    descKey: 'ACH_BOSS_KILLER_DESC',
+    isUnlocked: false,
+    type: 'SESSION',
+    condition: (stats, global, session) => session.bossKilled
+  },
+  {
+    id: 'rampage',
+    nameKey: 'ACH_RAMPAGE',
+    descKey: 'ACH_RAMPAGE_DESC',
+    isUnlocked: false,
+    type: 'SESSION',
+    condition: (stats) => stats.combo >= 10
+  },
+  {
+    id: 'veteran',
+    nameKey: 'ACH_VETERAN',
+    descKey: 'ACH_VETERAN_DESC',
+    isUnlocked: false,
+    type: 'CUMULATIVE',
+    condition: (stats, global) => global.totalKills >= 500
+  }
+];

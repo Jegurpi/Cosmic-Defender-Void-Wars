@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   CANVAS_HEIGHT, 
@@ -25,14 +26,22 @@ import {
   SHIP_STATS, 
   ShipClass, 
   UpgradeOption,
-  FloatingText 
+  FloatingText,
+  Achievement,
+  GlobalStats 
 } from '../types';
+import { Language, t } from '../translations';
 
 interface GameCanvasProps {
   selectedClass: ShipClass;
   gameMode: 'SINGLE' | 'COOP';
+  lang: Language;
   onGameOver: (score: number) => void;
   onExit: () => void;
+  achievements: Achievement[];
+  globalStats: GlobalStats;
+  onUnlockAchievement: (id: string) => void;
+  onUpdateStats: (kills: number) => void;
 }
 
 interface PlayerHudState {
@@ -45,7 +54,17 @@ interface PlayerHudState {
     isDead: boolean;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode, onGameOver, onExit }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({ 
+  selectedClass, 
+  gameMode, 
+  lang,
+  onGameOver, 
+  onExit,
+  achievements,
+  globalStats,
+  onUnlockAchievement,
+  onUpdateStats
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Game State Refs
@@ -73,14 +92,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
     combo: 0,
     comboTimer: 0
   });
+
+  const sessionStatsRef = useRef({
+      kills: 0,
+      timeAlive: 0,
+      powerupsCollected: 0,
+      bossKilled: false
+  });
   
   const starsRef = useRef<{x: number, y: number, size: number, speed: number}[]>([]);
 
   // React State for UI
   const [hudStats, setHudStats] = useState<GameStats>(gameStatsRef.current);
   const [playersHud, setPlayersHud] = useState<PlayerHudState[]>([]);
-  const [bossHpData, setBossHpData] = useState<{current: number, max: number, name: string} | null>(null);
+  const [bossHpData, setBossHpData] = useState<{current: number, max: number, nameKey: string} | null>(null);
   const [upgradeOptions, setUpgradeOptions] = useState<UpgradeOption[]>([]);
+  const [achievementNotification, setAchievementNotification] = useState<{nameKey: string, visible: boolean} | null>(null);
 
   // --- Initialization ---
 
@@ -138,6 +165,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       comboTimer: 0
     };
     
+    sessionStatsRef.current = { kills: 0, timeAlive: 0, powerupsCollected: 0, bossKilled: false };
+
     starsRef.current = Array.from({ length: STAR_COUNT }).map(() => ({
       x: Math.random() * CANVAS_WIDTH,
       y: Math.random() * CANVAS_HEIGHT,
@@ -180,15 +209,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
     const baseUpgrades: UpgradeOption[] = [
       {
         id: 'dmg_boost',
-        name: 'Усилитель плазмы',
-        description: '+20% к урону (Команда)',
+        nameKey: 'UPG_DMG_NAME',
+        descKey: 'UPG_DMG_DESC',
         rarity: 'COMMON',
         apply: (p) => { p.damageMultiplier += 0.2; }
       },
       {
         id: 'hp_boost',
-        name: 'Нано-броня',
-        description: '+30% Макс HP (Команда)',
+        nameKey: 'UPG_HP_NAME',
+        descKey: 'UPG_HP_DESC',
         rarity: 'COMMON',
         apply: (p) => { 
           p.maxHp *= 1.3; 
@@ -197,22 +226,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       },
       {
         id: 'fire_rate',
-        name: 'Система охлаждения',
-        description: '+15% скорострельности (Команда)',
+        nameKey: 'UPG_RATE_NAME',
+        descKey: 'UPG_RATE_DESC',
         rarity: 'RARE',
         apply: (p) => { p.fireRate *= 0.85; }
       },
       {
         id: 'speed_boost',
-        name: 'Ионный двигатель',
-        description: '+15% скорости (Команда)',
+        nameKey: 'UPG_SPEED_NAME',
+        descKey: 'UPG_SPEED_DESC',
         rarity: 'COMMON',
         apply: (p) => { p.speed *= 1.15; }
       },
       {
         id: 'full_restore',
-        name: 'Ремкомплект',
-        description: 'Полное восстановление HP',
+        nameKey: 'UPG_HEAL_NAME',
+        descKey: 'UPG_HEAL_DESC',
         rarity: 'RARE',
         apply: (p) => { p.hp = p.maxHp; }
       }
@@ -434,11 +463,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       }
   };
 
+  const checkAchievements = () => {
+      achievements.forEach(ach => {
+          if (!ach.isUnlocked) {
+              if (ach.condition(gameStatsRef.current, globalStats, sessionStatsRef.current)) {
+                  onUnlockAchievement(ach.id);
+                  // Show notification
+                  setAchievementNotification({ nameKey: ach.nameKey, visible: true });
+                  setTimeout(() => setAchievementNotification(null), 3000);
+              }
+          }
+      });
+  };
+
   // --- Update Loop ---
 
   const update = (timestamp: number, dt: number) => {
     if (gameStatsRef.current.isPaused || gameStatsRef.current.isGameOver || gameStatsRef.current.isLevelComplete) return;
     
+    // Stats Update
+    sessionStatsRef.current.timeAlive += dt;
+    checkAchievements();
+
     // Screen Shake Decay
     if (shakeRef.current > 0) {
         shakeRef.current *= 0.9;
@@ -664,7 +710,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
         setBossHpData({
             current: activeBoss!.hp,
             max: activeBoss!.maxHp,
-            name: activeBoss!.type === EnemyType.BOSS ? `БОСС УРОВНЯ ${gameStatsRef.current.level}` : 'ЭЛИТНЫЙ СТРАЖ'
+            nameKey: activeBoss!.type === EnemyType.BOSS ? 'BOSS_LVL' : 'BOSS_ELITE'
         });
     } else {
         setBossHpData(null);
@@ -712,6 +758,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
             if (e.hp <= 0) {
               e.markedForDeletion = true;
               
+              // Stats
+              sessionStatsRef.current.kills++;
+
               // Combo Logic
               addCombo();
               const comboMultiplier = 1 + (gameStatsRef.current.combo * 0.1);
@@ -724,6 +773,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
               if (e.type === EnemyType.BOSS) {
                   gameStatsRef.current.isLevelComplete = true;
                   gameStatsRef.current.isPaused = true;
+                  sessionStatsRef.current.bossKilled = true;
                   addShake(30);
                   generateUpgrades();
               } else if (e.type === EnemyType.MINIBOSS) {
@@ -761,6 +811,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
             if (player.hp <= 0) return;
             if (checkRectCollide(p, player)) {
                 p.markedForDeletion = true;
+                sessionStatsRef.current.powerupsCollected++;
                 spawnFloatingText(player.pos.x, player.pos.y - 20, p.type, COLORS.TEXT_HEAL);
                 if (p.type === PowerUpType.HEALTH) {
                     player.hp = Math.min(player.hp + 30, player.maxHp);
@@ -814,6 +865,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
     // Game Over Check
     if (playersRef.current.every(p => p.hp <= 0)) {
         gameStatsRef.current.isGameOver = true;
+        onUpdateStats(sessionStatsRef.current.kills);
         onGameOver(gameStatsRef.current.score);
     }
 
@@ -1075,6 +1127,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
         className="border-2 border-slate-700 bg-black shadow-2xl rounded-lg"
       />
       
+      {/* Achievement Notification */}
+      {achievementNotification && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 animate-[slideDown_0.5s_ease-out] w-80">
+              <div className="bg-yellow-500/90 text-black p-4 rounded-lg shadow-xl border-2 border-yellow-300 flex items-center gap-4">
+                   <div className="text-3xl">🏆</div>
+                   <div>
+                       <div className="font-black uppercase tracking-widest text-xs">{t('ACH_UNLOCKED', lang)}</div>
+                       <div className="font-bold">{t(achievementNotification.nameKey, lang)}</div>
+                   </div>
+              </div>
+          </div>
+      )}
+
       {/* Combo Meter */}
       {hudStats.combo > 1 && (
           <div className="absolute top-24 right-4 z-20 flex flex-col items-end animate-bounce">
@@ -1094,7 +1159,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       {/* Boss Health Bar */}
       {bossHpData && (
           <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[500px] z-20">
-              <div className="text-center text-red-500 font-bold mb-1 tracking-[0.2em] animate-pulse text-shadow-lg">{bossHpData.name}</div>
+              <div className="text-center text-red-500 font-bold mb-1 tracking-[0.2em] animate-pulse text-shadow-lg">{t(bossHpData.nameKey, lang)}</div>
               <div className="w-full h-4 bg-slate-900 border border-red-900 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-red-600 transition-all duration-100 ease-linear"
@@ -1107,13 +1172,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       {/* Mission Timer / Central HUD */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
         <div className={`text-3xl font-mono font-bold tracking-widest ${hudStats.missionTimeRemaining < 10000 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-            {hudStats.bossActive ? 'УНИЧТОЖИТЬ ЦЕЛЬ' : (hudStats.missionTimeRemaining / 1000).toFixed(1)}
+            {hudStats.bossActive ? t('HUD_KILL', lang) : (hudStats.missionTimeRemaining / 1000).toFixed(1)}
         </div>
         
         {/* Score/Level Centered */}
         <div className="flex gap-4 mt-2">
-            <div className="text-yellow-400 font-bold font-mono text-sm border border-slate-700 bg-slate-900/80 px-2 py-1 rounded">SCORE: {hudStats.score}</div>
-            <div className="text-cyan-400 font-bold font-mono text-sm border border-slate-700 bg-slate-900/80 px-2 py-1 rounded">LVL: {hudStats.level}</div>
+            <div className="text-yellow-400 font-bold font-mono text-sm border border-slate-700 bg-slate-900/80 px-2 py-1 rounded">{t('HUD_SCORE', lang)}: {hudStats.score}</div>
+            <div className="text-cyan-400 font-bold font-mono text-sm border border-slate-700 bg-slate-900/80 px-2 py-1 rounded">{t('HUD_LVL', lang)}: {hudStats.level}</div>
         </div>
       </div>
 
@@ -1121,10 +1186,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       <div className="absolute top-4 left-4 w-64">
          {playersHud[0] && (
          <div className={`transition-opacity duration-300 ${playersHud[0].isDead ? 'opacity-50 grayscale' : 'opacity-100'}`}>
-            <div className="text-xs text-cyan-400 font-bold mb-1">ИГРОК 1</div>
+            <div className="text-xs text-cyan-400 font-bold mb-1">{t('HOW_TO_PLAY_P1', lang)}</div>
              <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-600 backdrop-blur-sm mb-2">
                 <div className="flex justify-between text-xs text-slate-400 uppercase mb-1">
-                    <span>Броня</span>
+                    <span>{t('HUD_ARMOR', lang)}</span>
                     <span>{Math.ceil(Math.max(0, playersHud[0].hp))} / {Math.ceil(playersHud[0].maxHp)}</span>
                 </div>
                 <div className="w-full bg-slate-700 h-3 rounded-full overflow-hidden">
@@ -1140,7 +1205,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
                      E
                  </div>
                  <div className="flex-1">
-                     <div className="text-[10px] text-slate-300 font-bold mb-1">{SHIP_STATS[selectedClass].skillName}</div>
+                     <div className="text-[10px] text-slate-300 font-bold mb-1">{t(SHIP_STATS[selectedClass].skillNameKey, lang)}</div>
                      {!playersHud[0].skillReady && (
                          <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
                              <div 
@@ -1172,11 +1237,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       {gameMode === 'COOP' && playersHud[1] && (
       <div className="absolute top-4 right-4 w-64 text-right">
          <div className={`transition-opacity duration-300 ${playersHud[1].isDead ? 'opacity-50 grayscale' : 'opacity-100'}`}>
-             <div className="text-xs text-fuchsia-400 font-bold mb-1">ИГРОК 2</div>
+             <div className="text-xs text-fuchsia-400 font-bold mb-1">{t('HOW_TO_PLAY_P2', lang)}</div>
              <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-600 backdrop-blur-sm mb-2">
                 <div className="flex justify-between text-xs text-slate-400 uppercase mb-1">
                     <span>{Math.ceil(Math.max(0, playersHud[1].hp))} / {Math.ceil(playersHud[1].maxHp)}</span>
-                    <span>Броня</span>
+                    <span>{t('HUD_ARMOR', lang)}</span>
                 </div>
                 <div className="w-full bg-slate-700 h-3 rounded-full overflow-hidden relative">
                     <div 
@@ -1191,7 +1256,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
                      SHFT
                  </div>
                  <div className="flex-1">
-                     <div className="text-[10px] text-slate-300 font-bold mb-1">{SHIP_STATS[selectedClass].skillName}</div>
+                     <div className="text-[10px] text-slate-300 font-bold mb-1">{t(SHIP_STATS[selectedClass].skillNameKey, lang)}</div>
                      {!playersHud[1].skillReady && (
                          <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden relative">
                              <div 
@@ -1223,18 +1288,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       {hudStats.isPaused && !hudStats.isGameOver && !hudStats.isLevelComplete && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-slate-900 border border-slate-600 p-8 rounded-xl shadow-2xl text-center">
-                <h2 className="text-3xl font-bold text-white mb-6 tracking-widest">ПАУЗА</h2>
+                <h2 className="text-3xl font-bold text-white mb-6 tracking-widest">{t('PAUSE_TITLE', lang)}</h2>
                 <button 
                     onClick={() => { gameStatsRef.current.isPaused = false; }}
                     className="block w-full py-3 px-6 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold mb-4 transition"
                 >
-                    Продолжить
+                    {t('BTN_RESUME', lang)}
                 </button>
                 <button 
                     onClick={onExit}
                     className="block w-full py-3 px-6 bg-slate-700 hover:bg-slate-600 text-white rounded font-bold transition"
                 >
-                    Выйти в меню
+                    {t('BTN_MENU', lang)}
                 </button>
             </div>
         </div>
@@ -1244,8 +1309,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
       {hudStats.isLevelComplete && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50">
               <div className="max-w-4xl w-full p-8">
-                  <h2 className="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2 uppercase">Миссия Выполнена</h2>
-                  <p className="text-center text-slate-400 mb-10">Системы корабля готовы к модернизации</p>
+                  <h2 className="text-4xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2 uppercase">{t('LEVEL_COMPLETE', lang)}</h2>
+                  <p className="text-center text-slate-400 mb-10">{t('LEVEL_COMPLETE_SUB', lang)}</p>
                   
                   <div className="grid grid-cols-3 gap-6">
                       {upgradeOptions.map((opt) => (
@@ -1260,11 +1325,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, gameMode,
                           >
                               <div>
                                 <div className="text-xs font-bold opacity-70 mb-2 tracking-widest">{opt.rarity}</div>
-                                <div className="text-2xl font-bold text-white mb-4 group-hover:text-yellow-300">{opt.name}</div>
-                                <div className="text-slate-300 leading-relaxed">{opt.description}</div>
+                                <div className="text-2xl font-bold text-white mb-4 group-hover:text-yellow-300">{t(opt.nameKey, lang)}</div>
+                                <div className="text-slate-300 leading-relaxed">{t(opt.descKey, lang)}</div>
                               </div>
                               <div className="mt-4 text-center py-2 bg-white/10 rounded font-bold text-sm uppercase group-hover:bg-white/20">
-                                  Установить
+                                  {t('BTN_INSTALL', lang)}
                               </div>
                           </button>
                       ))}
